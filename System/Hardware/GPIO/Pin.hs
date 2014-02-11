@@ -3,7 +3,7 @@ module System.Hardware.GPIO.Pin
 
 import Data.Array
 import System.IO
-
+import Control.Monad
 data Pin = Pin { num :: Int
                , handle :: Handle 
                , dir :: PinMode
@@ -64,7 +64,7 @@ close pin = do
        ; _   -> return () 
        }
   ; let hdl = handle pin
-  ; hFlush hdl
+  ; when ((dir pin) == Out) (hFlush hdl)
   ; hClose hdl
   ; openWriteClose global_UNEXPORT_PATH (show pn)
   }

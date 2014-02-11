@@ -4,7 +4,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Concurrent.Chan
 
-main = let inputs = [newPeriodicEvent 1000000 True]
+main = let inputs = [newGpioEvent 7 g]
            outputs = [Immediate (print . head)]
            update msg state = tail state
        in  topLevel inputs update (cycle "GO PURDUE ") outputs
@@ -22,7 +22,7 @@ g Falling = Just (Legal False)
 -- RPi.RaspberryLambda.something. Naming is difficult actually
 
 -- I don't like this type synonym actually.
-type InputAction m = (m -> IO ()) -> IO ()
+type InputAction m = IO m
 
 data OutputAction s = Immediate (s -> IO ()) 
                     | Repeat Int (s -> IO ())
@@ -45,7 +45,7 @@ topLevel inputs update initial outputs =
   do
     -- fork and listen to inputs
     ch <- newChan
-    mapM_ forkIO $ map ($ writeChan ch) inputs
+    mapM_ forkIO $ map (newInputHandler ch) inputs
     -- fork and wait on outputs
     -- outStates is a list of MVar s
     outStates <- mapM newMVar $ replicate (length outputs) initial
@@ -64,7 +64,12 @@ topLevel inputs update initial outputs =
 updateMVar :: MVar a -> a -> IO ()
 updateMVar mv val = do tryTakeMVar mv
                        putMVar mv val
-
+                       
+-- ...
+newInputHandler :: Chan m -> InputAction m -> IO ()
+newInputHandler ch action = forever $ do msg <- action
+                                         writeChan ch msg
+                                         
 -- Creates an OutputHandler IO () (to be forked presumably) that will
 -- read state from MVar and output according to it. Immediate OutputActions
 -- will occur as soon as state is updated*. Repeat OutputActions will
@@ -90,19 +95,20 @@ newOutputHandler (Repeat interval output) mv =
 -- of GPIO.
 data Edge = Rising | Falling deriving (Show)
 newGpioEvent :: Int -> (Edge -> Maybe m) -> InputAction m
-newGpioEvent pinNumber newMsg action = do p <- P.init pinNumber In
-                                          loop p Zero
+newGpioEvent pinNumber newMsg  = do p <- P.init pinNumber In
+                                    val <- P.read p
+                                    loop p val
   where
     loop pin prev = do
       curr <- P.read pin
       let reaction = case (prev, curr) of (Zero, One) -> newMsg Rising
                                           (One, Zero) -> newMsg Falling
                                           (_, _) -> Nothing
-      case reaction of (Just msg) -> action msg
-                       Nothing -> return ()
-      loop pin curr
+      case reaction of (Just msg) -> do P.close pin
+                                        return msg
+                       Nothing -> loop pin curr
 
 -- Periodic event. Will periodically input m to the Chan
 newPeriodicEvent :: Int -> m -> InputAction m
-newPeriodicEvent interval msg action = forever $ do action msg
-                                                    threadDelay interval
+newPeriodicEvent interval msg = do threadDelay interval
+                                   return msg
