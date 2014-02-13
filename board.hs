@@ -23,6 +23,9 @@ decode 1 = Red
 decode 2 = Green
 decode 3 = Blue
 
+-- THIS IS WRONG. It puts each color in a whole byte. We want it in 3 bits.
+-- I'll have to fix this, but it'll be a pain due to multiples of 3 not
+-- playing nice with [Word8]
 boardToBits :: (a -> Color) -> [a] -> B.ByteString
 boardToBits f = B.pack . take uartOutBytes . (++ [0, 0 ..]) . map (encode . f)
 
