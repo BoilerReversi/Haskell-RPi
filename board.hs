@@ -13,7 +13,7 @@ uartOutBytes :: Int
 uartOutBytes = 24
 
 uartOutBits :: Int
-uartOutBits = 8 * 24
+uartOutBits = 8 * uartOutBytes
 
 boardSize :: Int
 boardSize = 64
