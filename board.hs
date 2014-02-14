@@ -1,55 +1,63 @@
 -- TODO
 -- Put this in a proper module and name it
 -- Other useful features for the board (if there are any more?)
+-- Maybe call it grid or something? We should name our generic board.
+--  Maybe something like BoilerBoard or BoilerGrid?
 
 import Data.Word
 import Data.Bits
 import qualified Data.ByteString as B
 
--- 192 bits that are sent to the board
+-- Constants
 uartOutBytes :: Int
 uartOutBytes = 24
+
+uartOutBits :: Int
+uartOutBits = 8 * 24
 
 boardSize :: Int
 boardSize = 64
 
+-- Color type and its en/decoding
+-- TODO: 
+--  Use all colors we will be using.
+--  Have the encoding match the bits to our LED driver for convenience
+--    Document that we made that domain-specific decision for convenience
 data Color = Blank | Red | Green | Blue deriving (Enum, Show)
 
-encode :: (Integral a) => Color -> a
+encode :: Color -> Int
 encode Blank = 0
 encode Red = 1
 encode Green = 2
 encode Blue = 3
 
-decode :: (Integral a) => a -> Color
+decode :: Int -> Color
 decode 0 = Blank
 decode 1 = Red
 decode 2 = Green
 decode 3 = Blue
 
--- EVERYTHING BELOW THIS IS PRETTY MESSED UP
--- THIS IS WRONG. It puts each color in a whole byte. We want it in 3 bits.
--- I'll have to fix this, but it'll be a pain due to multiples of 3 not
--- playing nice with [Word8]
+-- Top level transformations of board representation
+boardToByteString :: (a -> Color) -> [a] -> B.ByteString
+boardToByteString f = B.pack . boardToWords f
 
-boardToBits :: (a -> Color) -> [a] -> B.ByteString
-boardToBits f = B.pack . take uartOutBytes . map pack3PerByte . chunk . take boardSize . (++ [0, 0 ..]) . map (encode . f)
+-- 
+boardToWords :: (a -> Color) -> [a] -> [Word8]
+boardToWords f = map pack . partition 8 . boardToBools f
 
-boardToBitsOLD :: (a -> Color) -> [a] -> B.ByteString
-boardToBitsOLD f = B.pack . take uartOutBytes . (++ [0, 0 ..]) . map (encode . f)
-
--- Truncates if length [a] is not a multiple of 3
-chunk :: [a] -> [(a,a,a)]
-chunk (x:y:z:xs) = (x,y,z) : (chunk (z:xs))
-chunk _ = []
-
--- UNTESTED AND WRONG! ATM
-bitsToBoard :: (Color -> a) -> B.ByteString -> [a]
-bitsToBoard f = map (f . decode) . B.unpack
-
-pack3PerByte :: (Word8, Word8, Word8) -> Word8
-pack3PerByte (a,b,c) = (lower3 a) .|. 
-                       (shiftL (lower3 b) 3) .|. 
-                       (shiftL (lower3 c) 6)
+--
+boardToBools :: (a -> Color) -> [a] -> [Bool]
+boardToBools f = take uartOutBits . pad . foldr extractLower3 [] . (map (encode . f))
   where
-    lower3 v = v .&. 7
+  	pad = (++ [False, False ..])
+
+-- Helpers
+pack :: [Bool] -> Word8
+pack = foldl (\acc x-> if x then (setBit (shiftL acc 1) 0) else (shiftL acc 1)) 0 . take 8
+
+partition :: Int -> [a] -> [[a]]
+partition n [] = []
+partition n xs = (take n xs) : (partition n (drop n xs))
+
+extractLower3 :: (Bits a) => a -> [Bool] -> [Bool]
+extractLower3 x acc = (testBit x 0) : (testBit x 1) : (testBit x 2) : acc
