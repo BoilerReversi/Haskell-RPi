@@ -5,6 +5,7 @@ module System.RaspberryPi.Events (
   Edge(..),
   topLevel,
   getGpioEdge,
+  getGpioPinEdge,
   newGpioEvent,
   newPeriodicEvent
   ) where
@@ -85,6 +86,18 @@ newOutputHandler (OutputAction (Repeat interval) output) mv =
 
 data Edge = Rising | Falling deriving (Show)
 
+getGpioPinEdge :: P.Pin -> IO Edge
+getGpioPinEdge p = do val <- P.read p
+                      loop p val
+  where
+    loop pin prev = do
+      curr <- P.read pin
+      case (prev, curr) of (Zero, One) -> do P.close pin
+                                             return Rising
+                           (One, Zero) -> do P.close pin
+                                             return Falling
+                           (_, _) -> loop pin curr
+                           
 getGpioEdge :: Int -> IO Edge
 getGpioEdge pinNumber = do p <- P.init pinNumber In
                            val <- P.read p
