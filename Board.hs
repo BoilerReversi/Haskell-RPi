@@ -2,7 +2,9 @@ module Board (
   Color(..),
   boardToByteString,
   boardToWords,
-  boardToBools
+  boardToBools,
+  boardToBits,
+  partition
   ) where
 
 -- TODO
@@ -33,15 +35,15 @@ boardSize = 64
 data Color = Blank | Red | Green | Blue deriving (Enum, Show)
 
 encode :: Color -> Int
-encode Blank = 0
-encode Red = 1
-encode Green = 2
-encode Blue = 4
+encode Blank = 7
+encode Red = 6
+encode Green = 5
+encode Blue = 3
 
 decode :: Int -> Color
-decode 0 = Blank
-decode 1 = Red
-decode 2 = Green
+decode 7 = Blank
+decode 6 = Red
+decode 5 = Green
 decode 3 = Blue
 
 -- Top level transformations of board representation
@@ -51,6 +53,12 @@ boardToByteString f = B.pack . boardToWords f
 -- 
 boardToWords :: (a -> Color) -> [a] -> [Word8]
 boardToWords f = map pack . partition 8 . boardToBools f
+
+boardToBits :: (a -> Color) -> [a] -> [Int]
+boardToBits f xs = map bitify $ boardToBools f xs
+    where
+      bitify True = 1
+      bitify False = 0
 
 --
 boardToBools :: (a -> Color) -> [a] -> [Bool]
