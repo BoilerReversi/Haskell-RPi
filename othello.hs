@@ -54,11 +54,42 @@ uartBoard s b = mapM_ (mysend s) $ boardToWords squareToColor b
 mysend s w = send s $ B.pack [w]
 
 outputGameState :: SerialPort -> GameState -> IO ()
-outputGameState s (GameState b False False) = uartBoard s $ outputList False $ head b
-outputGameState s g@(GameState b _ True) = uartBoard s $ outputList True $ head b
+outputGameState s (GameState b False False) = uartBoard s $ outputList False False $ head b
+outputGameState s g@(GameState b _ True) = uartBoard s $ outputList True False $ head b
 outputGameState s g@(GameState b True False) = do print "DOING AI"
                                                   x <- readProcess "python" ["client.py", toEdaxString (head b)] []
+                                                  let c = j x
+                                                      ls = legalMoves (head b)
+                                                  if (isLegal (head b) c)
+                                                    then uartBoard s $ replaceAt (h x) (outputList False False $ head b) AI
+                                                    else uartBoard s $ outputList False True $ (head b)
                                                   print x
+                         
+  where
+    f 'A' = 0
+    f 'B' = 1
+    f 'C' = 2
+    f 'D' = 3
+    f 'E' = 4
+    f 'F' = 5
+    f 'G' = 6
+    f 'H' = 7
+    f _ = 7
+    
+    g '1' = 0
+    g '2' = 1
+    g '3' = 2
+    g '4' = 3
+    g '5' = 4
+    g '6' = 5
+    g '7' = 6
+    g '8' = 7
+    g _ = 7
+    
+    h (x:y:_) = ((f x) * 8) + (g y)
+    j (x:y:_) = (f x, g y)
+    k (x, y) = (x * 8) + y
+    replaceAt n xs v = take n xs ++ [v] ++ drop (n + 1) xs
 doAI :: GameState -> IO ()
 doAI g@(GameState b False _) = return ()
 doAI g@(GameState b True _) = do print "DOING AI"
@@ -88,5 +119,6 @@ main = do undoPin <- P.init 0 P.In
                                                     edgeListener legalPin Legal]
               initial = GameState {board = [initialBoard], ai = False, legal = False }
               update = updateGameState
-              outputs = [OutputAction Immediate $ outputGameState s]
+              outputs = [OutputAction Immediate $ (printBoard . head . board),
+                         OutputAction Immediate $ outputGameState s]
           topLevel inputs update initial outputs
