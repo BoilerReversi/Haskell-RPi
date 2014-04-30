@@ -92,10 +92,8 @@ getGpioPinEdge p = do val <- P.read p
   where
     loop pin prev = do
       curr <- P.read pin
-      case (prev, curr) of (Zero, One) -> do P.close pin
-                                             return Rising
-                           (One, Zero) -> do P.close pin
-                                             return Falling
+      case (prev, curr) of (Zero, One) -> return Rising
+                           (One, Zero) -> return Falling
                            (_, _) -> loop pin curr
                            
 getGpioEdge :: Int -> IO Edge

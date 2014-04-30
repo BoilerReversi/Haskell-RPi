@@ -32,20 +32,21 @@ boardSize = 64
 --  Use all colors we will be using.
 --  Have the encoding match the bits to our LED driver for convenience
 --    Document that we made that domain-specific decision for convenience
-data Color = Blank | Red | Green | Blue deriving (Enum, Show)
+data Color = Blank | Red | Green | Blue | White deriving (Enum, Show)
 
 encode :: Color -> Int
 encode Blank = 7
 encode Red = 6
 encode Green = 5
 encode Blue = 3
+encode White = 0
 
 decode :: Int -> Color
 decode 7 = Blank
 decode 6 = Red
 decode 5 = Green
 decode 3 = Blue
-
+decode 0 = White 
 -- Top level transformations of board representation
 boardToByteString :: (a -> Color) -> [a] -> B.ByteString
 boardToByteString f = B.pack . boardToWords f
