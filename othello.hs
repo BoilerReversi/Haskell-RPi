@@ -5,10 +5,11 @@ import System.Hardware.Serialport
 import qualified Data.ByteString as B
 import Board
 import Data.Word
+import System.Process(readProcess)
 
 data GameState = GameState { board :: [Board]
                            , ai :: Bool
-                           , legal :: Bool }
+                           , legal :: Bool } deriving (Show)
 
 data Message = Undo | Reset | Mark (Int, Int)
              | Save | Load | Suggest Bool | Legal Bool deriving (Show)
@@ -53,7 +54,16 @@ uartBoard s b = mapM_ (mysend s) $ boardToWords squareToColor b
 mysend s w = send s $ B.pack [w]
 
 outputGameState :: SerialPort -> GameState -> IO ()
-outputGameState s (GameState b ai legal) = uartBoard s $ outputList legal $ head b
+outputGameState s (GameState b False False) = uartBoard s $ outputList False $ head b
+outputGameState s g@(GameState b _ True) = uartBoard s $ outputList True $ head b
+outputGameState s g@(GameState b True False) = do print "DOING AI"
+                                                  x <- readProcess "python" ["client.py", toEdaxString (head b)] []
+                                                  print x
+doAI :: GameState -> IO ()
+doAI g@(GameState b False _) = return ()
+doAI g@(GameState b True _) = do print "DOING AI"
+                                 x <- readProcess "python" ["client.py", toEdaxString (head b)] []
+                                 print x
 
 updateGameState :: Message -> GameState -> GameState
 updateGameState (Mark c) g = if (isLegal (head $ board g) c)
@@ -63,10 +73,12 @@ updateGameState Undo g = case (board g) of
   [x] -> g
   (x:xs) -> g {board = xs}
 updateGameState Reset g = GameState {board = [initialBoard], ai = False, legal = False }
+updateGameState (Suggest x) g = g { ai = x }
+updateGameState (Legal x) g = g { legal = x }
 
 main = do undoPin <- P.init 0 P.In
           resetPin <- P.init 1 P.In
-          aiPin <- P.init 2 P.In
+          aiPin <- P.init 7 P.In
           legalPin <- P.init 3 P.In
           s <- openSerial "/dev/ttyAMA0" defaultSerialSettings { commSpeed = CS9600 }
           let inputs = map (InputAction Immediate) [uartListener s,
@@ -76,7 +88,5 @@ main = do undoPin <- P.init 0 P.In
                                                     edgeListener legalPin Legal]
               initial = GameState {board = [initialBoard], ai = False, legal = False }
               update = updateGameState
-              outputs = [OutputAction Immediate $ (printBoard . head . board),
-                         OutputAction Immediate $ outputGameState s]
+              outputs = [OutputAction Immediate $ outputGameState s]
           topLevel inputs update initial outputs
-              
