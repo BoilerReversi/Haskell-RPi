@@ -7,8 +7,13 @@ import Board
 import Data.Word
 import System.Process(readProcess)
 import System.Directory (doesFileExist)
+
+-- absolute paths required?
 savePath :: String
-savePath = "OTHELLOSAVE"
+savePath = "/root/Haskell-RPi/OTHELLOSAVE" 
+
+clientPath :: String
+clientPath = "/root/Haskell-RPi/client.py"
 
 data GameState = GameState { board :: [Board]
                            , ai :: Bool
@@ -35,12 +40,12 @@ uartListener s = do r <- recv s 1
                                                   return $ Load $ fromEdaxString x
                                           else uartListener s
 
-                        | w == 95 -> do print "got 95!"
-                                        return Save
+                        | w == 95 -> return Save
                         | otherwise -> uartListener s
 
 saveAction :: GameState -> IO ()
-saveAction (GameState (b:_) _ _ True) = writeFile savePath $ toEdaxString b
+saveAction (GameState (b:_) _ _ True) = do print "Saving game!"
+                                           writeFile savePath $ toEdaxString b
 saveAction (GameState _ _ _ False) = return ()
 
 risingListener :: P.Pin -> m -> IO m
@@ -70,7 +75,7 @@ outputGameState :: SerialPort -> String -> GameState -> IO ()
 outputGameState s _ (GameState b False False _) = uartBoard s $ outputList False False $ head b
 outputGameState s _ g@(GameState b _ True _) = uartBoard s $ outputList True False $ head b
 outputGameState s ip g@(GameState b True False _) = do print "DOING AI"
-                                                       x <- readProcess "python" ["client.py", ip, toEdaxString (head b)] []
+                                                       x <- readProcess "python" [clientPath, ip, toEdaxString (head b)] []
                                                        let c = j x
                                                            ls = legalMoves (head b)
                                                        if (isLegal (head b) c)
@@ -107,7 +112,7 @@ outputGameState s ip g@(GameState b True False _) = do print "DOING AI"
 doAI :: GameState -> IO ()
 doAI g@(GameState b False _ _) = return ()
 doAI g@(GameState b True _ _) = do print "DOING AI"
-                                   x <- readProcess "python" ["/root/Haskell-RPi/client.py", toEdaxString (head b)] []
+                                   x <- readProcess "python" [clientPath, toEdaxString (head b)] []
                                    print x
 
 updateGameState :: Message -> GameState -> GameState
