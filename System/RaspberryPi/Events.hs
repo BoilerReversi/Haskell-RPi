@@ -10,8 +10,7 @@ module System.RaspberryPi.Events (
   newPeriodicEvent
   ) where
 
--- This import should either be qualified or not at all
-import System.Hardware.GPIO.Pin as P
+import qualified System.Hardware.GPIO.Pin as P
 
 import Control.Concurrent
 import Control.Monad
@@ -21,7 +20,6 @@ data Timing = Immediate | Repeat Int
 data InputAction m = InputAction Timing (IO m)
 data OutputAction s = OutputAction Timing (s -> IO ()) 
 
--- Rename this to something less dumb than topLevel
 -- This function will...
 -- Tie each InputAction to the same central Chan, to which each
 --  InputAction will push messages of type m
@@ -59,7 +57,6 @@ updateMVar :: MVar a -> a -> IO ()
 updateMVar mv val = do tryTakeMVar mv
                        putMVar mv val
                        
--- ...
 newInputHandler :: Chan m -> InputAction m -> IO ()
 newInputHandler ch (InputAction Immediate action) = forever $ do msg <- action
                                                                  writeChan ch msg
@@ -118,7 +115,6 @@ newGpioEvent pinNumber newMsg = InputAction Immediate getMsg
                                  Nothing -> getMsg
                                    
 -- Periodic event.
--- Maybe don't have this in the module
 newPeriodicEvent :: Int -> m -> IO m
 newPeriodicEvent interval msg = do threadDelay interval
                                    return msg
